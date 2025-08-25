@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .messages {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: white;
+            border-radius: 3px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .connect { background-color: #28a745; color: white; }
+        .disconnect { background-color: #dc3545; color: white; }
+        .trigger { background-color: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket 테스트 페이지</h1>
+    
+    <div id="status" class="status disconnected">연결 상태: 연결되지 않음</div>
+    
+    <div>
+        <button id="connectBtn" class="connect">연결</button>
+        <button id="disconnectBtn" class="disconnect" disabled>연결 해제</button>
+        <button id="triggerBtn" class="trigger" disabled>수동 트리거</button>
+    </div>
+    
+    <h3>수신된 메시지:</h3>
+    <div id="messages" class="messages"></div>
+    
+    <script>
+        let ws = null;
+        const statusDiv = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const triggerBtn = document.getElementById('triggerBtn');
+        const messagesDiv = document.getElementById('messages');
+        
+        function updateStatus(connected) {
+            if (connected) {
+                statusDiv.textContent = '연결 상태: 연결됨';
+                statusDiv.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                triggerBtn.disabled = false;
+            } else {
+                statusDiv.textContent = '연결 상태: 연결되지 않음';
+                statusDiv.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                triggerBtn.disabled = true;
+            }
+        }
+        
+        function addMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.textContent = `${new Date().toLocaleTimeString()}: ${JSON.stringify(message, null, 2)}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function connect() {
+            ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}`);
+            
+            ws.onopen = function() {
+                console.log('WebSocket 연결됨');
+                updateStatus(true);
+                addMessage('WebSocket 연결됨');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    addMessage(message);
+                } catch (e) {
+                    addMessage(event.data);
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket 연결 종료');
+                updateStatus(false);
+                addMessage('WebSocket 연결 종료');
+                ws = null;
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket 오류:', error);
+                addMessage(`WebSocket 오류: ${error}`);
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+        
+        async function triggerNotification() {
+            try {
+                const response = await fetch('/api/sis/trigger', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: '수동으로 트리거된 알림',
+                        data: { source: 'manual', timestamp: new Date().toISOString() }
+                    })
+                });
+                
+                const result = await response.json();
+                addMessage(`트리거 결과: ${JSON.stringify(result)}`);
+            } catch (error) {
+                addMessage(`트리거 오류: ${error.message}`);
+            }
+        }
+        
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        triggerBtn.addEventListener('click', triggerNotification);
+        
+        // 페이지 로드 시 자동 연결
+        // connect();
+    </script>
+</body>
+</html>
