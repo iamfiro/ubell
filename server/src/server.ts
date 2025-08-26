@@ -18,6 +18,18 @@ const PORT: number = parseInt(process.env.PORT || '3000', 10);
 // 전역 WebSocket 서버 인스턴스
 export let globalWss: WebSocketServer | null = null;
 
+// CORS 설정
+app.use(cors({
+  origin: [
+    'http://localhost:5173',  // Vite 개발 서버
+    'http://localhost:3000',  // 다른 포트
+    'http://localhost:3001',  // SIS 포트 (필요시)
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(helmet());
 app.use(morgan('combined'));
 app.use(express.json());
@@ -87,6 +99,8 @@ async function startServer(): Promise<void> {
                   break;
                 case 'busCall':
                   const { stationId, routeNo } = data;
+
+                  console.log(stationId, routeNo);
 
                   const isStationBusExist = await prisma.bus.findMany({
                     where: {
@@ -164,6 +178,48 @@ async function startServer(): Promise<void> {
           
           ws.on('message', (message) => {
             console.log('SIS WebSocket 메시지 수신:', message.toString());
+            
+            try {
+              const data = JSON.parse(message.toString());
+              
+              switch (data.type) {
+                case 'callEnd':
+                  const { stationId, routeNo } = data;
+                  
+                  if (stationId && routeNo) {
+                    // BusCall 데이터 삭제
+                    prisma.busCall.deleteMany({
+                      where: {
+                        busId: `${stationId}-${routeNo}`
+                      }
+                    }).then(() => {
+                      console.log(`BusCall 삭제 완료: ${stationId}-${routeNo}`);
+                      
+                      // BIS 클라이언트들에게도 호출 종료 알림 브로드캐스트
+                      if (globalWss) {
+                        globalWss.clients.forEach((client) => {
+                          if (client.readyState === 1) { // WebSocket.OPEN
+                            client.send(JSON.stringify({
+                              type: 'busCallEnd',
+                              stationId: stationId,
+                              routeNo: routeNo,
+                              timestamp: new Date().toISOString()
+                            }));
+                          }
+                        });
+                      }
+                    }).catch((error) => {
+                      console.error('BusCall 삭제 중 오류:', error);
+                    });
+                  }
+                  break;
+                  
+                default:
+                  console.log('알 수 없는 SIS 메시지 타입:', data.type);
+              }
+            } catch (error) {
+              console.error('SIS WebSocket 메시지 파싱 오류:', error);
+            }
           });
           
           ws.on('close', () => {

@@ -2,7 +2,11 @@ import { Cloud } from '@mui/icons-material';
 import s from './style.module.scss';
 import { useState, useEffect } from 'react';
 
-export default function Header() {
+interface Props {
+    title: string;
+}
+
+export default function Header({ title }: Props) {
     const [time, setTime] = useState(new Date());
 
     useEffect(() => {
@@ -19,7 +23,7 @@ export default function Header() {
     return (
         <header className={s.header}>
             <div className={s.left}>
-                <h1 className={s.title}>숙명여자대학교</h1>
+                <h1 className={s.title}>{title}</h1>
                 <p className={s.subtitle}>BIS 버스 정보 시스템</p>
             </div>
             <div className={s.center}>

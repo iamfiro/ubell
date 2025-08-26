@@ -44,16 +44,16 @@ function broadcastToAll(message: any) {
   });
 }
 
-// cronjob 설정 - 매분마다 실행
-cron.schedule('* * * * *', async () => {
-  console.log('Cronjob 실행 중...');
+// setInterval 사용 - 15초마다 실행
+const intervalId = setInterval(async () => {
+  console.log('setInterval 실행 중... (15초마다)');
   
   try {
     await checkCondition();
   } catch (error) {
-    console.error('Cronjob 실행 중 오류 발생:', error);
+    console.error('setInterval 실행 중 오류 발생:', error);
   }
-});
+}, 3000); // 15초 = 15000ms
 
 // 조건 체크 함수 - Bus와 BusCall을 대조하여 조건 확인
 async function checkCondition(): Promise<boolean> {
@@ -79,42 +79,97 @@ async function checkCondition(): Promise<boolean> {
       return false;
     }
 
+    // 먼저 모든 BusCall 조회하여 연결된 벨이 있는 버스 파악
+    const allBusCalls = await prisma.busCall.findMany({
+      select: {
+        busId: true
+      }
+    });
+    
+    const busCallSet = new Set(allBusCalls.map(call => call.busId));
+    console.log(`연결된 벨이 있는 버스: ${allBusCalls.length}개 (${Array.from(busCallSet).join(', ')})`);
+
     const now = new Date();
     console.log(`현재 시간: ${now.toISOString()}`);
     
     // updatedAt을 기준으로 현재 시간과의 차이를 계산하여 arrivalTime 업데이트
+    const busesToDelete: string[] = [];
     const eligibleBuses = allBuses.filter(bus => {
       const timeDiff = Math.floor((now.getTime() - bus.updatedAt.getTime()) / 1000); // 초 단위
       const currentArrivalTime = Math.max(0, bus.arrivalTime - timeDiff); // 0 이하면 0으로 처리
       
-      console.log(`버스 ${bus.id} (${bus.stationId}-${bus.routeNo}):`);
-      console.log(`  - 원본 arrivalTime: ${bus.arrivalTime}초`);
-      console.log(`  - updatedAt: ${bus.updatedAt.toISOString()}`);
-      console.log(`  - 시간 차이: ${timeDiff}초`);
-      console.log(`  - 계산된 arrivalTime: ${currentArrivalTime}초 (0 이하면 0으로 처리)`);
-      console.log(`  - arrPrevStationCnt: ${bus.arrPrevStationCnt}`);
+      // arrivalTime이 0인 버스는 삭제 대상에 추가
+      if (currentArrivalTime === 0 && bus.arrPrevStationCnt === 0) {
+        busesToDelete.push(bus.id);
+        console.log(`버스 ${bus.id} (${bus.stationId}-${bus.routeNo}) - 삭제 대상으로 추가됨 (arrivalTime: 0)`);
+        return false;
+      }
       
-      // arrivalTime이 1-60초 사이이고, arrPrevStationCnt가 1인 경우
-      const isEligible = currentArrivalTime >= 1 && currentArrivalTime <= 60 && bus.arrPrevStationCnt === 1;
-      console.log(`  - 조건 만족 여부: ${isEligible ? '✅' : '❌'}`);
+      // 기존 조건: arrivalTime이 1-60초 사이이고, arrPrevStationCnt가 1인 경우
+      const meetsTimeCondition = currentArrivalTime >= 1 && currentArrivalTime <= 60 && bus.arrPrevStationCnt === 1;
+      
+      // 벨 연결 조건: 해당 버스에 BusCall이 있는 경우
+      const busCallId = `${bus.stationId}-${bus.routeNo}`;
+      const hasBusCall = busCallSet.has(busCallId);
+      
+      // 두 조건 중 하나라도 만족하면 포함
+      const isEligible = meetsTimeCondition && hasBusCall;
+      
+      // 조건을 만족하는 버스 상세 로그 출력
+      if (isEligible) {
+        console.log(`버스 ${bus.id} (${bus.stationId}-${bus.routeNo}):`);
+        console.log(`  - 원본 arrivalTime: ${bus.arrivalTime}초`);
+        console.log(`  - 계산된 arrivalTime: ${currentArrivalTime}초`);
+        console.log(`  - arrPrevStationCnt: ${bus.arrPrevStationCnt}`);
+        console.log(`  - 시간 조건 만족: ${meetsTimeCondition ? '✅' : '❌'}`);
+        console.log(`  - 벨 연결 상태: ${hasBusCall ? '✅ 연결됨' : '❌ 없음'}`);
+        console.log(`  - 최종 포함 여부: ✅ (${meetsTimeCondition ? '시간조건' : ''}${meetsTimeCondition && hasBusCall ? '+' : ''}${hasBusCall ? '벨연결' : ''})`);
+      }
       
       return isEligible;
     });
 
     console.log(`조건을 만족하는 버스: ${eligibleBuses.length}개`);
     
+    // arrivalTime이 0인 버스들과 연결된 BusCall 삭제
+    if (busesToDelete.length > 0) {
+      try {
+        // 먼저 연결된 BusCall 삭제
+        const deletedBusCalls = await prisma.busCall.deleteMany({
+          where: {
+            busId: {
+              in: busesToDelete
+            }
+          }
+        });
+        console.log(`연결된 ${deletedBusCalls.count}개 BusCall이 삭제되었습니다.`);
+        
+        // 그 다음 버스 삭제
+        await prisma.bus.deleteMany({
+          where: {
+            id: {
+              in: busesToDelete
+            }
+          }
+        });
+        console.log(`arrivalTime이 0인 ${busesToDelete.length}개 버스가 삭제되었습니다:`, busesToDelete);
+      } catch (error) {
+        console.error('버스 및 BusCall 삭제 중 오류 발생:', error);
+      }
+    }
+    
     if (eligibleBuses.length === 0) {
-      console.log('조건을 만족하는 버스가 없습니다.');
+      console.log('시간 조건을 만족하거나 벨이 연결된 버스가 없습니다.');
 
       const message = {
         type: 'bus_call_list',
         data: {
-            busCallId: []
+            eligibleBuses: []
         }
       }
 
-    broadcastToAll(message);
-    
+      broadcastToAll(message);
+      
       return false;
     }
 
@@ -123,45 +178,60 @@ async function checkCondition(): Promise<boolean> {
       console.log(`  - ${bus.stationId}-${bus.routeNo} (ID: ${bus.id})`);
     });
 
-    // BusCall과 대조하여 매칭되는 버스 확인
-    // BusCall의 busId는 ${stationId}-${routeNo} 형태
+    // eligibleBuses에 포함된 버스들의 BusCall 상태 확인
     const busCallIds = eligibleBuses.map(bus => `${bus.stationId}-${bus.routeNo}`);
-    console.log(`검색할 BusCall ID들: ${busCallIds.join(', ')}`);
+    console.log(`최종 선택된 버스 ID들: ${busCallIds.join(', ')}`);
     
-    const matchingBusCalls = await prisma.busCall.findMany({
-      where: {
-        busId: {
-          in: busCallIds
-        }
-      }
-    });
+    const matchingBusCalls = allBusCalls.filter(call => busCallIds.includes(call.busId));
 
-    console.log(`매칭되는 BusCall: ${matchingBusCalls.length}개`);
-    
+    console.log(`최종 선택된 버스 중 벨이 연결된 버스: ${matchingBusCalls.length}개`);
     if (matchingBusCalls.length > 0) {
-      console.log('매칭되는 BusCall 목록:');
+      console.log('벨이 연결된 버스 목록:');
       matchingBusCalls.forEach(call => {
         console.log(`  - ${call.busId}`);
       });
-
-      const message = {
-        type: 'bus_call_list',
-        data: {
-            busCallId: matchingBusCalls.map(call => call.busId)
-        }
-      }
-
-      broadcastToAll(message);
-      
-      console.log(`총 ${matchingBusCalls.length}개의 매칭된 버스 호출을 개별적으로 전송했습니다.`);
-      
-      console.log('=== checkCondition 완료: true 반환 ===');
-      return true;
     }
 
-    console.log('매칭되는 BusCall이 없습니다.');
-    console.log('=== checkCondition 완료: false 반환 ===');
-    return false;
+    // 조건을 만족하는 버스가 있으면 항상 WebSocket broadcast
+    const message = {
+      type: 'bus_call_list',
+      data: {
+          eligibleBuses: eligibleBuses.map(bus => {
+            const busCallId = `${bus.stationId}-${bus.routeNo}`;
+            const hasBusCall = matchingBusCalls.some(call => call.busId === busCallId);
+            
+            return {
+              id: bus.id,
+              stationId: bus.stationId,
+              routeNo: bus.routeNo,
+              arrivalTime: bus.arrivalTime,
+              arrPrevStationCnt: bus.arrPrevStationCnt,
+              hasBusCall: hasBusCall
+            };
+          })
+      }
+    }
+
+    broadcastToAll(message);
+    
+    console.log(`총 ${eligibleBuses.length}개의 버스 (시간조건 + 벨연결)와 ${matchingBusCalls.length}개의 활성 BusCall을 WebSocket으로 전송했습니다.`);
+    
+    // 포함된 버스들의 조건별 분류 로그
+    const timeConditionBuses = eligibleBuses.filter(bus => {
+      const timeDiff = Math.floor((now.getTime() - bus.updatedAt.getTime()) / 1000);
+      const currentArrivalTime = Math.max(0, bus.arrivalTime - timeDiff);
+      return currentArrivalTime >= 1 && currentArrivalTime <= 60 && bus.arrPrevStationCnt === 1;
+    });
+    const bellConnectedBuses = eligibleBuses.filter(bus => 
+      busCallSet.has(`${bus.stationId}-${bus.routeNo}`)
+    );
+    
+    console.log(`  - 시간 조건만 만족: ${timeConditionBuses.filter(bus => !busCallSet.has(`${bus.stationId}-${bus.routeNo}`)).length}개`);
+    console.log(`  - 벨 연결만 있음: ${bellConnectedBuses.filter(bus => !timeConditionBuses.includes(bus)).length}개`);
+    console.log(`  - 시간조건 + 벨연결: ${bellConnectedBuses.filter(bus => timeConditionBuses.includes(bus)).length}개`);
+    
+    console.log('=== checkCondition 완료: true 반환 ===');
+    return true;
   } catch (error) {
     console.error('=== checkCondition 오류 발생 ===');
     console.error('오류 내용:', error);

@@ -4,12 +4,16 @@ interface SearchInputProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   onEnterPress: (value: string) => void;
+  onFocus?: () => void;
+  placeholder?: string;
 }
 
 const SearchInput: React.FC<SearchInputProps> = ({ 
   searchTerm, 
   onSearchChange, 
-  onEnterPress 
+  onEnterPress,
+  onFocus,
+  placeholder = "버스번호를 입력하세요 (예: 150)"
 }) => {
   return (
     <div style={{ marginBottom: '32px' }}>
@@ -26,7 +30,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
         type="text"
         value={searchTerm}
         onChange={(e) => onSearchChange(e.target.value)}
-        placeholder="버스번호를 입력하세요 (예: 150)"
+        placeholder={placeholder}
         style={{ 
           padding: '20px 24px', 
           border: '3px solid #d1d5db', 
@@ -45,7 +49,10 @@ const SearchInput: React.FC<SearchInputProps> = ({
             }
           }
         }}
-        onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+        onFocus={(e) => {
+          e.target.style.borderColor = '#2563eb';
+          onFocus?.();
+        }}
         onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
       />
     </div>

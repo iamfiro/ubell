@@ -35,23 +35,23 @@
 
     .center {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        gap: 10px;
+        gap: 24px;
 
         .time {
-            font-size: 28px;
+            font-size: 38px;
             font-weight: 600;
 
             margin: 0;
-            
-            color: #2B9569;
-        }
+                    }
 
         .station {
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 500;
             margin: 0;
+
+            color: #656565;
         }
     }
 
@@ -62,9 +62,9 @@
         border-radius: 999px;
         border: 0;
 
-        font-size: 16px;
-        font-weight: 600;
+        font-size: 22px;
+        font-weight: 700;
 
-        color: #858585;
+        color: #e8e8e8;
     }
 }
