@@ -2,13 +2,14 @@ import s from './style.module.scss';
 import { useEffect, useState, useRef } from 'react';
 
 const NEWS_ITEMS = [
-    "트럼프 숙청·혁명 같은 한국 상황... 우린 사업 못 한다",
-    "알바생·배달라이더까지 본사와 교섭할 판...원·하청 연계 많은 유통업, 줄파업 우려",
-    "특검 박성재, 계엄 때 심우정한테 합수부에 검사 파견 지시 영장 적시"
+    "김정은 덕에 친해진 이재명·트럼프… 유대감 형성 큰 성과 [美 전문가 평가]",
+    "‘내란 방조’ 한덕수 전 총리, 오늘 구속 기로",
+    "[미니 다큐]죽음의 '손배 폭탄' 막을 노란봉투법...20년 만에 국회 통과"
 ];
 
-const WAIT_DURATION = 3000; // 3초 대기
-const ANIMATION_DURATION = 12000; // 12초 동안 슬라이드
+const WAIT_DURATION = 2000; // 2초 대기 (짧은 텍스트)
+const ANIMATION_DURATION = 8000; // 8초 동안 마키 (긴 텍스트)
+const ANIMATION_DELAY = 500; // 0.5초 지연
 
 export default function News() {
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -16,7 +17,7 @@ export default function News() {
     const [direction, setDirection] = useState<'enter' | 'exit'>('enter');
     const textRef = useRef<HTMLParagraphElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const animationTimer = useRef<NodeJS.Timeout | null>(null);
+    const animationTimer = useRef<number | null>(null);
 
     const startNextSlide = () => {
         setDirection('exit');
@@ -28,28 +29,34 @@ export default function News() {
 
     const checkOverflow = () => {
         if (textRef.current && containerRef.current) {
-            const isOverflowing = textRef.current.scrollWidth > containerRef.current.clientWidth;
+            const textWidth = textRef.current.scrollWidth;
+            const containerWidth = containerRef.current.clientWidth;
+            const isOverflowing = textWidth > containerWidth;
             
             if (isOverflowing) {
-                // 긴 텍스트의 경우 애니메이션 시작
+                // CSS 변수로 정확한 이동 거리 설정
+                const moveDistance = textWidth - containerWidth + 50; // 50px 여백
+                textRef.current.style.setProperty('--move-distance', `-${moveDistance}px`);
+                
+                // 긴 텍스트의 경우 마키 애니메이션 시작
                 setIsAnimating(true);
                 
-                // 애니메이션이 끝나고 3초 후에 다음 슬라이드로
+                // 애니메이션 시작 후 전체 시간 후에 다음 슬라이드로
                 if (animationTimer.current) {
                     clearTimeout(animationTimer.current);
                 }
-                animationTimer.current = setTimeout(() => {
+                animationTimer.current = window.setTimeout(() => {
                     startNextSlide();
-                }, ANIMATION_DURATION + WAIT_DURATION);
+                }, ANIMATION_DELAY + ANIMATION_DURATION + WAIT_DURATION);
             } else {
-                // 짧은 텍스트의 경우 5초 후에 다음 슬라이드로
+                // 짧은 텍스트의 경우 정적 표시 후 다음 슬라이드로
                 setIsAnimating(false);
                 if (animationTimer.current) {
                     clearTimeout(animationTimer.current);
                 }
-                animationTimer.current = setTimeout(() => {
+                animationTimer.current = window.setTimeout(() => {
                     startNextSlide();
-                }, 5000);
+                }, WAIT_DURATION * 2); // 4초간 표시
             }
         }
     };

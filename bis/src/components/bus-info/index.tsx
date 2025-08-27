@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import AccessibleIcon from '@mui/icons-material/Accessible';
 import s from './style.module.scss';
 import { DirectionsBus } from '@mui/icons-material';
 
@@ -16,6 +15,9 @@ interface BusInfoProps {
     updatedAt?: Date;
     routeTp?: string;
     isCalled?: boolean; // 호출 상태 추가
+    isFocused?: boolean; // 일반 모드 포커스
+    isSelected?: boolean; // 음성 모드 선택
+    isVoiceMode?: boolean; // 음성 모드 여부
 }
 
 export default function BusInfo({ 
@@ -23,25 +25,26 @@ export default function BusInfo({
     disablePeople = false, 
     time, 
     station, 
-    routeType,
-    vehicleType,
     onBusCall,
     stationId,
     wsInstance,
     updatedAt,
     routeTp,
-    isCalled
+    isCalled,
+    isFocused = false,
+    isSelected = false,
+    isVoiceMode = false
 }: BusInfoProps) {
     const [isCalling, setIsCalling] = useState(false);
-    const [tick, setTick] = useState(0);
 
-    console.log(routeTp)
+    // 1초마다 화면 갱신을 위한 상태
+    const [, forceUpdate] = useState(0);
 
     // 1초마다 화면 갱신 (실제 시간 계산은 getActualRemainingTime에서 처리)
     useEffect(() => {
         const timer = setInterval(() => {
             // 강제로 리렌더링하여 시간 표시 업데이트
-            setTick(prev => prev + 1);
+            forceUpdate(prev => prev + 1);
         }, 1000);
 
         return () => clearInterval(timer);
@@ -140,32 +143,55 @@ export default function BusInfo({
         
         // time은 이미 DB에서 계산된 arrivalTime이므로, 경과 시간을 빼서 실제 남은 시간 계산
         const actualTime = Math.max(0, time - timeDiff);
-        
-        console.log(`시간 계산: DB시간=${time}s, 경과시간=${timeDiff}s, 실제남은시간=${actualTime}s`);
-        
+                
         return actualTime;
     };
 
     // 시간 표시 함수
     const getTimeDisplay = () => {
         const actualTime = getActualRemainingTime();
-
-        console.log(actualTime)
         
         if (actualTime <= 0) {
             return '곧 도착';
         } else if (actualTime < 60) {
             return `곧 도착`;
         } else {
-            const [minutes, seconds] = [Math.floor(actualTime / 60), actualTime % 60];
+            const minutes = Math.floor(actualTime / 60);
             return `${minutes}분`;
         }
     };
 
     const isWsConnected = wsInstance && wsInstance.readyState === WebSocket.OPEN;
 
+    // 포커스/선택 상태에 따른 스타일 계산
+    const getContainerStyle = () => {
+        const baseStyle = {};
+        
+        if (isFocused && !isVoiceMode) {
+            // 일반 모드 포커스 스타일
+            return {
+                ...baseStyle,
+                outline: '3px solid #007AFF',
+                outlineOffset: '2px',
+                borderRadius: '8px'
+            };
+        }
+        
+        if (isSelected && isVoiceMode) {
+            // 음성 모드 선택 스타일
+            return {
+                ...baseStyle,
+                backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                border: '2px solid #007AFF',
+                borderRadius: '8px'
+            };
+        }
+        
+        return baseStyle;
+    };
+
     return (
-        <article className={s.busInfo}>
+        <article className={s.busInfo} style={getContainerStyle()}>
             <div className={s.left} style={{
                 backgroundColor: routeTp === '마을버스' ? 'yellow' : routeTp === '광역버스' ? 'red' : 'blue',
                 display: 'flex',
@@ -197,7 +223,6 @@ export default function BusInfo({
                                    isCalled ? '#ff8800' : '#efefef',
                     color: !isWsConnected || disablePeople ? '#fff' : 
                            isCalled ? '#fff' : '#333',
-                    cursor: (!isWsConnected || disablePeople || isCalling) ? 'not-allowed' : 'pointer'
                 }}
             >
                 <p>

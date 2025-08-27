@@ -33,9 +33,10 @@
     margin: 0;
     position: relative;
     left: 0;
+    --move-distance: 0px; // 초기값 설정
 
     &.animate {
-        animation: marquee 12s linear;
+        animation: marquee 8s linear;
         animation-delay: 0.5s; // 들어오는 애니메이션이 끝난 후 시작
     }
 }
@@ -44,8 +45,11 @@
     0% {
         transform: translateX(0);
     }
+    25% {
+        transform: translateX(0);
+    }
     100% {
-        transform: translateX(calc(-100% + 100vw));
+        transform: translateX(var(--move-distance, -50%));
     }
 }
 
