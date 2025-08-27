@@ -306,7 +306,7 @@ function Home() {
     
     inputTimerRef.current = window.setTimeout(() => {
       console.log('음성 모드 3초 타이머 만료로 종료 (테스트용)');
-      speak("3초간 입력이 없어 일반 모드로 전환 되었습니다, 다시 하시려면 키패드 0번 버튼을 눌러주세요");
+      speak("5초간 입력이 없어 일반 모드로 전환 되었습니다, 다시 하시려면 키패드 0번 버튼을 눌러주세요");
       // 현재 선택된 버스를 포커스로 설정
       setFocusedBusIndex(selectedBusIndex);
       setIsVoiceMode(false);
@@ -757,32 +757,6 @@ function Home() {
         />
         
         {/* 디버깅용 버스 순서 표시 */}
-        {import.meta.env.DEV && uniqueBuses && uniqueBuses.length > 0 && (
-          <div style={{
-            position: 'fixed',
-            bottom: '10px',
-            right: '10px',
-            background: 'rgba(0,0,0,0.8)',
-            color: 'white',
-            padding: '10px',
-            borderRadius: '5px',
-            fontSize: '12px',
-            maxWidth: '300px',
-            zIndex: 999
-          }}>
-            <div><strong>🚌 uniqueBuses 순서:</strong></div>
-            {uniqueBuses.map((bus, idx) => (
-              <div key={bus.id} style={{
-                color: idx === selectedBusIndex ? '#ffff00' : 
-                       idx === focusedBusIndex ? '#00ff00' : 'white'
-              }}>
-                [{idx}] {bus.routeNo}번 - {Math.ceil(bus.arrivalTime)}분
-                {idx === selectedBusIndex && ' ← 음성'}
-                {idx === focusedBusIndex && ' ← 포커스'}
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* 마지막 업데이트 시간 표시 */}
         {stationBusInfo && (
