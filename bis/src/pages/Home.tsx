@@ -429,7 +429,7 @@ function Home() {
           }
       };
 
-        speak(`${convertNumbersToKorean(currentBus.routeNo)}번 ${getTimeDisplay()}. 호출하시려면 엔터키를 눌러주세요`);
+        speak(`${convertNumbersToKorean(currentBus.routeNo)}번 버스 ${getTimeDisplay()}. 호출하시려면 엔터키를 눌러주세요`);
       }
     }
   }, [uniqueBuses, calledBuses, speak, convertNumbersToKorean]);
@@ -670,7 +670,7 @@ function Home() {
           boxShadow: '0 2px 10px rgba(0, 122, 255, 0.3)',
           animation: 'pulse 2s infinite'
         }}>
-          🎤 음성 모드 (3초 자동해제-테스트)
+          🎤 음성 모드
         </div>
       )}
       
