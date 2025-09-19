@@ -1,4 +1,6 @@
 .news {
+    width: 100%;
+    
     overflow: hidden;
     position: relative;
     padding: 18px 20px;
@@ -33,24 +35,7 @@
     margin: 0;
     position: relative;
     left: 0;
-    --move-distance: 0px; // 초기값 설정
-
-    &.animate {
-        animation: marquee 8s linear;
-        animation-delay: 0.5s; // 들어오는 애니메이션이 끝난 후 시작
-    }
-}
-
-@keyframes marquee {
-    0% {
-        transform: translateX(0);
-    }
-    25% {
-        transform: translateX(0);
-    }
-    100% {
-        transform: translateX(var(--move-distance, -50%));
-    }
+    display: inline-block;
 }
 
 @keyframes slideOutLeft {

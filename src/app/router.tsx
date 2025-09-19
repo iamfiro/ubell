@@ -6,12 +6,10 @@ export const router = createBrowserRouter([
   {
     path: "/bis",
     element: <BISOnboardPage />,
-    children: [
-      {
-        path: "/bis/:cityCode/:stationId",
-        element: <BISServicePage />,
-      },
-    ],
+  },
+  {
+    path: "/bis/:cityCode/:stationId",
+    element: <BISServicePage />,
   },
   {
     path: "/sis",
